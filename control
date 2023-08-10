@@ -1,0 +1,9 @@
+Package: com.dvntm.pfpviewer
+Name: PFPViewer
+Version: 0.0.2
+Architecture: iphoneos-arm
+Description: Tweak to view profile pictures
+Maintainer: dvntm
+Author: dvntm
+Section: Tweaks
+Depends: mobilesubstrate
