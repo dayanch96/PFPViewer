@@ -33,7 +33,7 @@
 
                     NSArray *components = [imageLink componentsSeparatedByString:@"?size="];
                     NSString *newImageLink;
-                    if (components.count >= 2) newImageLink = [NSString stringWithFormat:@"%@?size=1280", components.firstObject];
+                    if (components.count >= 2) newImageLink = [NSString stringWithFormat:@"%@?size=4096", components.firstObject];
 
                     NSURL *url = [NSURL URLWithString:newImageLink];
                     NSData *data = [NSData dataWithContentsOfURL:url];
