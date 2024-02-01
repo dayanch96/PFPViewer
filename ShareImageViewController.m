@@ -15,16 +15,30 @@
                                                                    action:@selector(shareButtonTapped:)];    
 
     self.title = @"💕";
-    self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = [UIColor clearColor];
     self.navigationItem.leftBarButtonItem = dismissButton;
     self.navigationItem.rightBarButtonItem = shareButton;
-    
+
+    self.navigationController.navigationBar.translucent = YES;
+    [self.navigationController.navigationBar setBackgroundImage:[UIImage new] forBarMetrics:UIBarMetricsDefault];
+    self.navigationController.navigationBar.shadowImage = [UIImage new];
+    [self.navigationController.navigationBar setTintColor:[UIColor colorWithRed:255/255.0 green:29/255.0 blue:83/255.0 alpha:255/255.0]];
+
+    UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
+    UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+    blurEffectView.frame = self.view.bounds;
+    blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.view addSubview:blurEffectView];
+    [self.view sendSubviewToBack:blurEffectView];
+
     [[UIDevice currentDevice]._tapticEngine actuateFeedback:1];
-    
+
     if (self.gifDataToShare) {
-        FLAnimatedImageView *imageView = [[FLAnimatedImageView alloc] initWithFrame:self.view.bounds];
+        YYAnimatedImageView *imageView = [[YYAnimatedImageView alloc] initWithFrame:self.view.bounds];
         imageView.contentMode = UIViewContentModeScaleAspectFit;
-        imageView.animatedImage = [FLAnimatedImage animatedImageWithGIFData:self.gifDataToShare];
+        YYImage *animatedImage = [YYImage imageWithData:self.gifDataToShare];
+        imageView.image = animatedImage;
+
         [self.view addSubview:imageView];
     }
 
@@ -33,7 +47,9 @@
         animatedImageView.frame = self.view.bounds;
         animatedImageView.contentMode = UIViewContentModeScaleAspectFit;
         [self.view addSubview:animatedImageView];
-    } else {
+    }
+
+    else {
         UIImageView *imageView = [[UIImageView alloc] initWithFrame:self.view.bounds];
         imageView.contentMode = UIViewContentModeScaleAspectFit;
         imageView.image = (UIImage *)self.imageToShare;
@@ -43,6 +59,14 @@
 
 - (void)closeButtonTapped:(id)sender {
     [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+
+    if (![self isBeingDismissed] && [self.delegate respondsToSelector:@selector(didVCDismiss)]) {
+        [self.delegate didVCDismiss];
+    }
 }
 
 - (void)shareButtonTapped:(id)sender {
@@ -82,4 +106,5 @@
         [self presentViewController:activityVC animated:YES completion:nil];
     }
 }
+
 @end
