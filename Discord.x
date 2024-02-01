@@ -1,127 +1,112 @@
 #import "ShareImageViewController.h"
 
-%hook DCDFastImageView
-- (instancetype)initWithFrame:(CGRect)frame {
-    self = %orig(frame);
-    if (self) [self addHandleLongPress];
-    return self;
-}
+UIWindow *window;
 
-%new
-- (void)addHandleLongPress {
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-    longPress.minimumPressDuration = 0.3;
-    [self addGestureRecognizer:longPress];
-}
+static void showImageFromURL(id delegate, NSString *URLString) {
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"(size=)\\d+" options:0 error:nil];
+    NSRange range = NSMakeRange(0, [URLString length]);
+    URLString = [regex stringByReplacingMatchesInString:URLString options:0 range:range withTemplate:@"size=4096"];
 
-%new
-- (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
-    if (sender.state == UIGestureRecognizerStateBegan) {
-        RCTImageSource *avatarImageView = self.source;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIImpactFeedbackGenerator *haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+        [haptic prepare];
+        [haptic impactOccurred];
 
-        if (avatarImageView) {
-            NSString *imageUrlDescription = [avatarImageView description];
-            if (imageUrlDescription && [imageUrlDescription isKindOfClass:[NSString class]]) {
-                NSRange startRange = [imageUrlDescription rangeOfString:@"URL="];
-                NSRange endRange = [imageUrlDescription rangeOfString:@", size"];
+        window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        window.windowLevel = UIWindowLevelAlert + 1;
+        window.rootViewController = [[UIViewController alloc] init];
+        [window makeKeyAndVisible];
 
-                if (startRange.location != NSNotFound && endRange.location != NSNotFound) {
-                    NSUInteger startIndex = startRange.location + startRange.length;
-                    NSUInteger endIndex = endRange.location;
-                    NSRange urlRange = NSMakeRange(startIndex, endIndex - startIndex);
-                    NSString *imageLink = [imageUrlDescription substringWithRange:urlRange];
+        JGProgressHUD *downloadingHUD = [JGProgressHUD progressHUDWithStyle:JGProgressHUDStyleDark];
+        downloadingHUD.interactionType = JGProgressHUDInteractionTypeBlockNoTouches;
+        [downloadingHUD showInView:window];
 
-                    NSArray *components = [imageLink componentsSeparatedByString:@"?size="];
-                    NSString *newImageLink;
-                    if (components.count >= 2) newImageLink = [NSString stringWithFormat:@"%@?size=1280", components.firstObject];
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:URLString]];
 
-                    NSURL *url = [NSURL URLWithString:newImageLink];
-                    NSData *data = [NSData dataWithContentsOfURL:url];
-                    NSString *cleanedLink = [newImageLink componentsSeparatedByString:@"?size="].firstObject;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [downloadingHUD dismissAnimated:YES];
 
-                    UIImage *image = [UIImage imageWithData:data];
-                    NSString *extension = [cleanedLink pathExtension];
+                if (data) {
+                    NSString *extension = [[URLString componentsSeparatedByString:@"?size="].firstObject pathExtension];
 
                     ShareImageViewController *shareVC = [[ShareImageViewController alloc] init];
-                    shareVC.gifDataToShare = data;
+                    shareVC.delegate = delegate;
                     UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:shareVC];
-                    navigationController.navigationBar.tintColor = [UIColor colorWithRed:255/255.0 green:29/255.0 blue:83/255.0 alpha:255/255.0];
-                    UIViewController *currentController = [UIApplication sharedApplication].keyWindow.rootViewController;
-                    [currentController presentViewController:navigationController animated:YES completion:nil];
+                    navigationController.modalPresentationStyle = UIModalPresentationFormSheet;
 
                     if (extension && [extension isEqualToString:@"gif"]) {
                         shareVC.gifDataToShare = data;
                     } else {
+                        UIImage *image = [UIImage imageWithData:data];
                         NSData *pngData = UIImagePNGRepresentation(image);
                         UIImage *pngImage = [UIImage imageWithData:pngData];
                         shareVC.imageToShare = pngImage;
                     }
+
+                    [window.rootViewController presentViewController:navigationController animated:YES completion:nil];
                 }
-            }
-        }
+            });
+        });
+    });
+}
+
+%hook DCDFastImageView
+- (instancetype)initWithFrame:(CGRect)frame {
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(showImage:)];
+    longPress.minimumPressDuration = 0.3;
+    [self addGestureRecognizer:longPress];
+
+    return %orig;
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    // Disable interaction with animated effect on profile picture
+    if ([[self.source description] containsString:@"avatar-decoration-presets"]) {
+        [self setUserInteractionEnabled:NO];
     }
+}
+
+%new
+- (void)showImage:(UILongPressGestureRecognizer *)sender {
+    if (sender.state == UIGestureRecognizerStateBegan) {
+
+        NSString *URLString = self.source.request.URL.absoluteString;
+        if (URLString) showImageFromURL(self, URLString);
+    }
+}
+
+%new
+- (void)didVCDismiss {
+    [window removeFromSuperview];
+    window = nil;
 }
 %end
 
 %hook RCTImageView
 - (id)initWithBridge:(id)arg1 {
-    self = %orig;
-    if (self) [self addHandleLongPress];
-    return self;
-}
-
-%new
-- (void)addHandleLongPress {
-    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(showImage:)];
     longPress.minimumPressDuration = 0.3;
     [self addGestureRecognizer:longPress];
+
+    return %orig;
 }
 
 %new
-- (void)handleLongPress:(UILongPressGestureRecognizer *)sender {
+- (void)showImage:(UILongPressGestureRecognizer *)sender {
     if (sender.state == UIGestureRecognizerStateBegan) {
-        NSArray *avatarImageView = self.imageSources;
 
-        if (avatarImageView) {
-            NSString *imageUrlDescription = [avatarImageView description];
-            if (imageUrlDescription && [imageUrlDescription isKindOfClass:[NSString class]]) {
-                NSRange startRange = [imageUrlDescription rangeOfString:@"URL="];
-                NSRange endRange = [imageUrlDescription rangeOfString:@", size"];
-
-                if (startRange.location != NSNotFound && endRange.location != NSNotFound) {
-                    NSUInteger startIndex = startRange.location + startRange.length;
-                    NSUInteger endIndex = endRange.location;
-                    NSRange urlRange = NSMakeRange(startIndex, endIndex - startIndex);
-                    NSString *imageLink = [imageUrlDescription substringWithRange:urlRange];
-
-                    NSArray *components = [imageLink componentsSeparatedByString:@"?size="];
-                    NSString *newImageLink;
-                    if (components.count >= 2) newImageLink = [NSString stringWithFormat:@"%@?size=1280", components.firstObject];
-
-                    NSURL *url = [NSURL URLWithString:newImageLink];
-                    NSData *data = [NSData dataWithContentsOfURL:url];
-                    NSString *cleanedLink = [newImageLink componentsSeparatedByString:@"?size="].firstObject;
-                    
-                    UIImage *image = [UIImage imageWithData:data];
-                    NSString *extension = [cleanedLink pathExtension];
-
-                    ShareImageViewController *shareVC = [[ShareImageViewController alloc] init];
-                    shareVC.gifDataToShare = data;
-                    UINavigationController *navigationController = [[UINavigationController alloc] initWithRootViewController:shareVC];
-                    navigationController.navigationBar.tintColor = [UIColor colorWithRed:255/255.0 green:29/255.0 blue:83/255.0 alpha:255/255.0];
-                    UIViewController *currentController = [UIApplication sharedApplication].keyWindow.rootViewController;
-                    [currentController presentViewController:navigationController animated:YES completion:nil];
-
-                    if (extension && [extension isEqualToString:@"gif"]) {
-                        shareVC.gifDataToShare = data;
-                    } else {
-                        NSData *pngData = UIImagePNGRepresentation(image);
-                        UIImage *pngImage = [UIImage imageWithData:pngData];
-                        shareVC.imageToShare = pngImage;
-                    }
-                }
-            }
-        }
+        RCTImageSource *source = self.imageSources[0];
+        NSString *URLString = source.request.URL.absoluteString;
+        if (URLString) showImageFromURL(self, URLString);
     }
+}
+
+%new
+- (void)didVCDismiss {
+    [window removeFromSuperview];
+    window = nil;
 }
 %end
