@@ -2,7 +2,6 @@
 #import <Foundation/Foundation.h>
 #import <Photos/Photos.h>
 #import "YYImage/YYImage.h"
-#import "JGProgressHUD/JGProgressHUD.h"
 
 @interface _UITapticEngine : NSObject
 - (void)actuateFeedback:(NSInteger)count;
@@ -58,6 +57,16 @@
 - (void)showPFP:(UILongPressGestureRecognizer *)sender;
 @end
 
+@interface TTKAvatar : NSObject
+@property (nonatomic, assign, readonly) BDImageView *avatarImageView;
+@end
+
+@interface TTKEnlargeAvatarViewController : UIViewController
+@property (nonatomic, strong, readwrite) UIButton *closeButton;
+@property (nonatomic, strong, readwrite) TTKAvatar *avatar;
+- (void)showPFP:(UILongPressGestureRecognizer *)sender;
+@end
+
 // Twitch
 @interface TWImageView : UIImageView
 @property (nonatomic, strong, readwrite) UIImage *placeholder;
@@ -89,10 +98,7 @@
 @property (atomic, copy, readwrite) NSURL *URL;
 @end
 
-@interface ELMImageNode : ASNetworkImageNode
-@end
-
 @interface _ASDisplayView : UIView
-@property (nonatomic, strong, readwrite) ELMImageNode *keepalive_node;
+@property (nonatomic, strong, readwrite) ASNetworkImageNode *keepalive_node;
 - (void)savePFP:(UILongPressGestureRecognizer *)sender;
 @end
