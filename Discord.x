@@ -2,7 +2,7 @@
 
 UIWindow *window;
 
-static void showImageFromURL(id delegate, NSString *URLString) {
+static void showImageFromURL(UIView *view, id delegate, NSString *URLString) {
     NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"(size=)\\d+" options:0 error:nil];
     NSRange range = NSMakeRange(0, [URLString length]);
     URLString = [regex stringByReplacingMatchesInString:URLString options:0 range:range withTemplate:@"size=4096"];
@@ -17,15 +17,21 @@ static void showImageFromURL(id delegate, NSString *URLString) {
         window.rootViewController = [[UIViewController alloc] init];
         [window makeKeyAndVisible];
 
-        JGProgressHUD *downloadingHUD = [JGProgressHUD progressHUDWithStyle:JGProgressHUDStyleDark];
-        downloadingHUD.interactionType = JGProgressHUDInteractionTypeBlockNoTouches;
-        [downloadingHUD showInView:window];
+        UIView *bg = [[UIView alloc] initWithFrame:view.bounds];
+        bg.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.7];
+        [view addSubview:bg];
+
+        UIActivityIndicatorView *activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
+        activityIndicator.color = [UIColor colorWithRed:255/255.0 green:29/255.0 blue:83/255.0 alpha:255/255.0];
+        activityIndicator.center = view.center;
+        [bg addSubview:activityIndicator];
+        [activityIndicator startAnimating];
 
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:URLString]];
 
             dispatch_async(dispatch_get_main_queue(), ^{
-                [downloadingHUD dismissAnimated:YES];
+                [bg removeFromSuperview];
 
                 if (data) {
                     NSString *extension = [[URLString componentsSeparatedByString:@"?size="].firstObject pathExtension];
@@ -74,7 +80,7 @@ static void showImageFromURL(id delegate, NSString *URLString) {
     if (sender.state == UIGestureRecognizerStateBegan) {
 
         NSString *URLString = self.source.request.URL.absoluteString;
-        if (URLString) showImageFromURL(self, URLString);
+        if (URLString) showImageFromURL(self, self, URLString);
     }
 }
 
@@ -100,7 +106,7 @@ static void showImageFromURL(id delegate, NSString *URLString) {
 
         RCTImageSource *source = self.imageSources[0];
         NSString *URLString = source.request.URL.absoluteString;
-        if (URLString) showImageFromURL(self, URLString);
+        if (URLString) showImageFromURL(self, self, URLString);
     }
 }
 
